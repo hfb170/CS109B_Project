@@ -1,1 +1,3 @@
-Contents for this folder
+Contents for this folder:
+ 1- Delivered materials for the milestone submission
+ 2- codes created
