@@ -1,0 +1,12 @@
+
+```{r}
+#Nina's note: I ended up using the IMDB 5000 dataset for the EDA, so I answered the question with it.
+data <- read.csv("movie_metadata.csv")
+data16 <- data[data$title_year == '2016',]
+titles <- as.vector(data16[order(data16$imdb_score, decreasing = TRUE),]$movie_title)
+genres <- as.vector(data16[order(data16$imdb_score, decreasing = TRUE),]$genres)
+
+#top 10
+rbind(titles, genres)[,1:10]
+```
+
