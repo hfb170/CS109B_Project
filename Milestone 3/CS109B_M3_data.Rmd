@@ -1,0 +1,270 @@
+
+Detailed description and implementation of the model:
+**Comments:** The glmnet package was used to construct logistic regression models for classification of movie genres represented in binary 0-1 values. The binary representation aided in dealing with the multi-label and imbalanced data issues within this data set; data was acquired from TBDM, with missing data being supplemented from IMDB where appropriate. 
+
+The cv.glm function was used because it is both stringent and flexible- it allows for selecting the optimal lambda value via built-in tuning and also does built-in cross-validation, but the function also has settings that allow control for the model. For these test runs, the lowest values for thresh and maxit were used in order to run the models quickly and troubleshoot where needed, and see what the accuracy may be on these lower values to test the efficacy of the document-term-matrices.
+
+Further information on the model, and the various control settings can be found here: https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html
+
+Text2Vec was used to construct document-term-matrices from the Overview field in the data set- the Overview field contains descriptions of the plots of the movies. The objective of creating the DTMs is to use them as "bag-of-words" to drive genre classification via logistic regression. The DTMs were also normalized in order to suppress the overrepresentation of any particular words.
+
+Description of your performance metrics
+**Comments:**
+The following performance metrics were used for genre classification:
+
+1) Misclassification Error plots: the misclassification error plots indicate model classification accuracy for different values of lambda. This is one of the reasons why separate models were constructed for each genre- it seems that different values of lambda are needed for higher accuracy by genre. Glmnet fits a generalized linear model via penalized maximum likelihood- a grid of values of lambda, the regularization parameter, is used to compute the regularization path for the lasso or the elasticnet penalty (Glmnet Vignette).
+
+2) Coefficients vs. lambda plots: The model coefficients are shown to vary with different values of lambda. Each curve in this plot relates to a variable. The top-axis is more useful in this case because it indicates the number of nonzero coefficients at the current λ, the effective degrees of freedom (df) (Glmnet Vignette). Certainly the coeffient plots should be used in conjunction with the misclassifcation error plots to choose the optimal value of lambda (if the user simply does not want to use the $min function).
+
+3) Classification accuracy: Misclassification accuracy was calculated from the caret package instead in an attempt to use an "outside" function so that any classification accuracy is not just attributed to the glmnet package algorithms alone.
+
+Careful performance evaluations for the models
+**Comments:** Please see below: performance evaluations were done by plotting and calculating the metrics mentioned previously.
+
+Visualizations of the metrics for performance evaluation
+**Comments:** Please see below.
+
+Discussion of the differences between the models, their strengths, weaknesses, etc.
+**Comments:** The second model used for classification was SVM. In comparison to logistic regression, the SVM does not classify via probabilistic determination, but instead focuses on geometric separation by determining an optimal separating hyperplane. 
+
+The advantage of LR is that it is great if there is a lot of noise in the data. Meanwhile, the disadvantage of using an SVM is that it may attempt to separate two classes of data that could be composed of multiple dimensions, and SVMs have difficulty when the classes are not clearly separable. 
+
+Discussion of the performances you achieved, and how you might be able to improve them in the future
+**Comments:** Models can be improved by tuning alpha. It will also help to fine tune the values of the maxit and thresh controls. Additionally, it may help to construct differently sized training sets, and measure performance based on increase in training data. 
+
+Different accuracies were achieved for different genres, some genres as low as approx. 60%- this is most likely because the Overview words for these genres were very generic. Perhaps increasing the training data size may help.
+
+```{r}
+set.seed(200)
+suppressWarnings(suppressMessages(library(text2vec)))
+suppressWarnings(suppressMessages(library(data.table)))
+suppressWarnings(suppressMessages(library(mclust)))
+
+#Note: I followed the directions here to construct a document-term matrix for the Overview field in the data set: http://text2vec.org/vectorization.html
+
+movies <- read.csv("Meta_data_49_cleaned.csv")
+
+#the genre labels matrix attempts to override the imbalanced data and multi-label problems in this data set
+g.labels <- read.csv("Genres_labels_49.csv")
+
+head(movies, 4)
+head(g.labels, 4)
+
+movies <- cbind(movies, g.labels)
+
+#coerce data table
+setDT(movies)
+
+#create key on data table called id
+setkey(movies, id)
+
+#set all_id variable to easily refer to ids when splitting
+all_ids = movies$id
+
+#set train ids, difference is test set ids
+train_ids = sample(all_ids, 2500)
+test_ids = setdiff(all_ids, train_ids)
+
+#subset by ids
+train = movies[J(train_ids)]
+test = movies[J(test_ids)]
+```
+
+```{r}
+#The objective is to create a document term matrix, this chunk of code creates a vocabulary vector.
+
+prep_fun = tolower
+tok_fun = word_tokenizer
+
+#itoken() creates an iterator over tokens
+it_train = itoken(as.character(train$overview), 
+             preprocessor = prep_fun, 
+             tokenizer = tok_fun, 
+             ids = train$id, 
+             progressbar = FALSE)
+
+vocab = create_vocabulary(it_train)
+vocab
+```
+
+```{r}
+#Document term matrix is created from vocab vector
+vectorizer = vocab_vectorizer(vocab)
+dtm_train = create_dtm(it_train, vectorizer)
+
+#check the dimensions of the DTM to ensure same # of rows as train set, this will be important when running the model
+dim(dtm_train)
+```
+
+```{r}
+#repeat above steps for test set
+ts.prep_fun = tolower
+ts.tok_fun = word_tokenizer
+
+it_test = itoken(as.character(test$overview), 
+             preprocessor = ts.prep_fun, 
+             tokenizer = ts.tok_fun, 
+             ids = test$id, 
+             progressbar = FALSE)
+
+ts.vocab = create_vocabulary(it_test)
+
+ts.vocab = create_vocabulary(it_test)
+ts.vocab
+
+ts.vectorizer = vocab_vectorizer(ts.vocab)
+dtm_test = create_dtm(it_test, ts.vectorizer)
+dim(dtm_test)
+```
+
+```{r}
+#normalize DTMs to remove unequal weight from overrepresentation of certain words
+tfidf = TfIdf$new()
+
+dtm_train_tfidf = fit_transform(dtm_train, tfidf)
+
+dtm_test_tfidf  = create_dtm(it_test, vectorizer) %>% 
+  transform(tfidf)
+```
+
+```{r}
+suppressWarnings(suppressMessages(library(glmnet)))
+
+NFOLDS = 5
+
+#set to binomial due to 0-1 labeling in the genre lables matrix, alpha was not tuned. cv.glmnet auto-tunes for the best value of lambda
+
+glmnet_classifierA = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,15]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = 1e-3,
+                              maxit = 1e3)
+
+glmnet_classifierB = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,16]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = 1e-3,
+                              maxit = 1e3)
+
+glmnet_classifierC = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,17]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = 1e-3,
+                              maxit = 1e3)
+
+glmnet_classifierD = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,18]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = 1e-3,
+                              maxit = 1e3)
+
+glmnet_classifierE = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,19]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = 1e-3,
+                              maxit = 1e3)
+
+glmnet_classifierF = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,21]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = 1e-3,
+                              maxit = 1e3)
+
+glmnet_classifierG = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,25]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = 1e-3,
+                              maxit = 1e3)
+
+glmnet_classifierH = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,31]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = 1e-3,
+                              maxit = 1e3)
+
+#Missclassification error plots for different values of lambda
+plot(glmnet_classifierA)
+plot(glmnet_classifierB)
+plot(glmnet_classifierC)
+plot(glmnet_classifierD)
+plot(glmnet_classifierE)
+plot(glmnet_classifierF)
+plot(glmnet_classifierG)
+plot(glmnet_classifierH)
+```
+
+```{r}
+#coefficient performance over lambda
+plot(glmnet_classifierA$glmnet.fit)
+plot(glmnet_classifierB$glmnet.fit)
+plot(glmnet_classifierC$glmnet.fit)
+plot(glmnet_classifierD$glmnet.fit)
+plot(glmnet_classifierE$glmnet.fit)
+plot(glmnet_classifierF$glmnet.fit)
+plot(glmnet_classifierG$glmnet.fit)
+plot(glmnet_classifierH$glmnet.fit)
+```
+
+
+```{r}
+#predictions on test DTM
+predsA = predict(glmnet_classifierA, dtm_test_tfidf, type = 'response')
+predsB = predict(glmnet_classifierB, dtm_test_tfidf, type = 'response')
+predsC = predict(glmnet_classifierC, dtm_test_tfidf, type = 'response')
+predsD = predict(glmnet_classifierD, dtm_test_tfidf, type = 'response')
+predsE = predict(glmnet_classifierE, dtm_test_tfidf, type = 'response')
+predsF = predict(glmnet_classifierF, dtm_test_tfidf, type = 'response')
+predsG = predict(glmnet_classifierG, dtm_test_tfidf, type = 'response')
+predsH = predict(glmnet_classifierH, dtm_test_tfidf, type = 'response')
+```
+
+```{r}
+#accuracy
+sprintf("Action genre classification accuracy is: %.3f percent", (1-classError(round(predsA), as.matrix(test[,15]))$errorRate)*100)
+sprintf("Adventure genre classification accuracy is: %.3f percent", (1-classError(round(predsB), as.matrix(test[,16]))$errorRate)*100)
+sprintf("Animation genre classification accuracy is: %.3f percent", (1-classError(round(predsC), as.matrix(test[,17]))$errorRate)*100)
+sprintf("Comedy genre classification accuracy is: %.3f percent", (1-classError(round(predsD), as.matrix(test[,18]))$errorRate)*100)
+sprintf("Crime genre classification accuracy is: %.3f percent", (1-classError(round(predsE), as.matrix(test[,19]))$errorRate)*100)
+sprintf("Drama genre classification accuracy is: %.3f percent", (1-classError(round(predsF), as.matrix(test[,21]))$errorRate)*100)
+sprintf("Horror genre classification accuracy is: %.3f percent", (1-classError(round(predsG), as.matrix(test[,25]))$errorRate)*100)
+sprintf("Thriller genre classification accuracy is: %.3f percent", (1-classError(round(predsH), as.matrix(test[,31]))$errorRate)*100)
+```
+
+**Comment**During my search for efficient tuning of alpha and lambda parameters, I came across this post for the glmnet method: https://stats.stackexchange.com/questions/69638/does-caret-train-function-for-glmnet-cross-validate-for-both-alpha-and-lambda?rq=1
+
+Currently my settings on the model pasted below result in an infinite loop, but for future improvements I aim to configure this model to a working state because I think it is a good option via which both the alpha and lambda parameters can be tuned.
+
+[/**Comment**]
+
+```{#r}
+
+suppressWarnings(suppressMessages(library(caret)))
+
+eGrid <- expand.grid(.alpha = (1:10) * 0.1, 
+                     .lambda = (1:10) * 0.1)
+
+Control <- trainControl(method = "repeatedcv", repeats = 10, classProbs =TRUE)
+
+
+netFit <- train(x =as.matrix(dtm_train_tfidf), y = factor(as.matrix(train[,15]), labels = c("yes", "no")),
+          method = "glmnet",
+          tuneGrid = eGrid,
+          trControl = Control)
+          
+```
