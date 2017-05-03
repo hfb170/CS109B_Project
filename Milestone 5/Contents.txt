@@ -1,1 +1,2 @@
-Similar Conttents
+1- Training data for more complicated architectures
+2- Analysis done for the predictions and the final classification
