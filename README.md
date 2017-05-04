@@ -3,6 +3,4 @@ CS109B Group Project
 
 Group project for CS109B - Spring 2017
 
-This folder is divided by milestones. Every milestone folder included all the codes, results and data manipulated for this specific milestone
-
-A full repository of the data is currently under construction and will be include in this project.
+This repository should be as divided into two partitions. The first partition is the folder "Project Codes" whic is meant to be the deliverable material of this repository while the second is the rest of the folders are mainly one folder per milestone and 
