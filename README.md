@@ -15,6 +15,8 @@ The folder include four subdirectories which are \:
  - Data exploration and pre-processing
  - Conventional models
  * Neural models
+ 
+ The following presentation of the different files is respecting the chronological evolution of the analysis pursued for the project
 
 ### Data Acquisition:
 
@@ -41,5 +43,24 @@ This folder includes the following files:
   - As the file "PosterProc.ipynb" was necessary for the conventional models, the file "PosterProcNN.ipynb" was necessary for the Deep Learniing models. This file transform the poster image into a numerical array that can be handled by different network architectures
   
   
+### Conventional Models:
 
+Pursuant to all the data preparation work presented above, the modeling work was tackled in Milestones from 3 to 5. This folder include the files that covers the following models investigated by the team
+
+ - Logistic regression based on the overview/keywords NLP (CS109B_LogReg_updated.Rmd)
+ - Logistic regression based on the color statistics (datasci_DD_logit.Rmd)
+ - SVM based on the color statistics (datasci_DD_svm.Rmd)
+ - The random forest and addaboost applied on all the acquired features (Random_Forest_Decision_Tree_Gradient_Boosting_cs109b (1).ipynb)
+
+### The neural models
+
+Finally the deep learning models which is partitioned into two main folders, the training folder and the test folder.
+
+- The training folder includes a subfolder for each architecture that includes the code file, the exported h5 model and the accumulated accurracy during the training as a csv file
+
+- The test folder include one folder for the basic CNNarchitecture variants that includes a generic code used for evaluation in addition to two data file per each varianat. The first is the predicted probability and the second is the calculated proximity distance as a derived metric to be used for visualization
+
+ - The other folders are structured as a single folder for each architecture that has the same file structure which is a code for the evaluation of the test prediction and two data files:one for the predicted probability and the second for the metric used for visualization
+ 
+ - In addition a last folder "Analysis" which was the last to be introduced. This folder includes all the acquired prediction data and metrics that was subsequently used by the file "CS109b-project_DL_Viz.Rmd" to produce the necessary visualizations
 
