@@ -3,7 +3,7 @@ CS109B Group Project
 
 Group project for CS109B - Spring 2017
 
-This repository should be as divided into two partitions. The first partition is the folder "Project Codes" which is meant to be the deliverable material of this repository while the second is the rest of the folders are mainly one folder per milestone and folder for the file used to produce visualizations or from which other project visualizations were implemented. This material is also exixtent in another repository with the following link:
+This repository should be as divided into two partitions. The first partition is the folder "Project Codes" which is meant to be the deliverable material of this repository while the second is the rest of the folders are mainly one folder per milestone and folder for the file used to produce visualizations or from which other project visualizations were implemented. This material is also existent in another repository with the following link:
 
 https://github.com/nina-ifti/CS109B_Project_Group26.git
 
