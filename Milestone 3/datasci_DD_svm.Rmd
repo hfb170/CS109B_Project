@@ -1,0 +1,632 @@
+---
+title: "SVM for Genres"
+author: "group 26"
+date: "4/19/2017"
+output: pdf_document
+---
+
+```{r, echo = FALSE}
+library(readr)
+library(e1071)
+
+train1 <- read_csv("~/Library/Mobile Documents/com~apple~CloudDocs/Data Science 2/train1.csv")
+test1 <- read_csv("~/Library/Mobile Documents/com~apple~CloudDocs/Data Science 2/test1.csv")
+train2 <- read_csv("~/Library/Mobile Documents/com~apple~CloudDocs/Data Science 2/train2.csv")
+test2 <- read_csv("~/Library/Mobile Documents/com~apple~CloudDocs/Data Science 2/test2.csv")
+train1 = train1[,-1]
+test1 = test1[,-1]
+train2 = train2[,-1]
+test2 = test2[,-1]
+
+
+features <- read_csv("~/Library/Mobile Documents/com~apple~CloudDocs/Data Science 2/Features_Balanced.csv")
+features = features[,-1]
+
+
+# for adding color features into the data
+
+# train1_complete = merge(train1, features, by ='ID')
+# train2_complete = merge(train2, features, by ='ID')
+# 
+# test1_complete = merge(test1, features, by = 'ID')
+# test2_complete = merge(test2, features, by = 'ID')
+
+
+# write.csv(test1_complete, file = 'test1.csv')
+# write.csv(test2_complete, file = 'test2.csv')
+# 
+# write.csv(train1_complete, file = 'train1.csv')
+# write.csv(train2_complete, file = 'train2.csv')
+
+```
+
+
+
+Quick Prin Comp analysis to see if there are significantly fewer prin components than genres. Turns out there aren't. There are 18 genres, and it takes 14 principle components to explain 92% of variation. So going with individual genres will be better. 
+```{r}
+
+pca = prcomp(train1[,12:29])
+pr.var = pca$sdev^2
+sum(pr.var)
+sum(pr.var[1:14])/ sum(pr.var)
+
+```
+
+
+
+```{r}
+train1_complete = train1
+
+train1_used = scale(train1[,c(2,6,8:10,30:38)], center=TRUE, scale=TRUE)
+test1_used = scale(test1[,c(2,6,8:10,30:38)], center = TRUE, scale=TRUE)
+
+
+
+action_svm = svm(unlist(train1[,12]) ~ .*. , kernel = 'radial' , data=train1_used)
+adventure_svm = svm(unlist(train1[,13]) ~ .*. , kernel = 'radial',data=train1_used)
+animation_svm = svm(unlist(train1[,14]) ~ .*. , kernel = 'radial',data=train1_used)
+comedy_svm = svm(unlist(train1[,15]) ~ .*. , kernel = 'radial',data=train1_used)
+crime_svm = svm(unlist(train1[,16])~ .*. , kernel = 'radial',data=train1_used)
+doc_svm = svm(unlist(train1[,17]) ~ .*. , kernel = 'radial',data=train1_used)
+drama_svm = svm(unlist(train1[,18]) ~ .*. , kernel = 'radial',data=train1_used)
+family_svm = svm(unlist(train1[,19]) ~ .*. , kernel = 'radial',data=train1_used)
+fantasy_svm = svm(unlist(train1[,20]) ~ .*. , kernel = 'radial',data=train1_used)
+hist_svm = svm(unlist(train1[,21]) ~ .*. , kernel = 'radial',data=train1_used)
+horror_svm = svm(unlist(train1[,22]) ~ .*. , kernel = 'radial',data=train1_used)
+music_svm = svm(unlist(train1[,23]) ~ .*. , kernel = 'radial',data=train1_used)
+mystery_svm = svm(unlist(train1[,24]) ~ .*. , kernel = 'radial',data=train1_used)
+romance_svm = svm(unlist(train1[,25]) ~ .*. , kernel = 'radial',data=train1_used)
+scifi_svm = svm(unlist(train1[,26]) ~ .*. , kernel = 'radial',data=train1_used)
+thrill_svm = svm(unlist(train1[,27]) ~ .*. , kernel = 'radial',data=train1_used)
+war_svm = svm(unlist(train1[,28]) ~ .*. , kernel = 'radial',data=train1_used)
+western_svm = svm(unlist(train1[,29]) ~ .*. , kernel = 'radial',data=train1_used)
+
+
+
+binary_convert = function(preds){
+  preds_bin = preds
+  for ( i in 1:length(preds)){
+  if(preds[i]>.5){preds_bin[i] = 1}
+  else{preds_bin[i] = 0 }
+  }
+  return(preds_bin)
+}
+
+preds_act = binary_convert(predict(action_svm, newdata = test1_used))
+preds_ad = binary_convert(predict(adventure_svm, newdata = test1_used))
+preds_ani = binary_convert(predict(animation_svm, newdata = test1_used))
+preds_com = binary_convert(predict(comedy_svm, newdata = test1_used))
+preds_cri = binary_convert(predict(crime_svm, newdata = test1_used))
+preds_doc = binary_convert(predict(doc_svm, newdata = test1_used))
+preds_dra = binary_convert(predict(drama_svm, newdata = test1_used))
+preds_fam = binary_convert(predict(family_svm, newdata = test1_used))
+preds_fant = binary_convert(predict(fantasy_svm, newdata = test1_used))
+preds_hist = binary_convert(predict(hist_svm, newdata = test1_used))
+preds_hor = binary_convert(predict(horror_svm, newdata = test1_used))
+preds_mus = binary_convert(predict(music_svm, newdata = test1_used))
+preds_mys = binary_convert(predict(mystery_svm, newdata = test1_used))
+preds_rom = binary_convert(predict(romance_svm, newdata = test1_used))
+preds_sci = binary_convert(predict(scifi_svm, newdata = test1_used))
+preds_thr = binary_convert(predict(thrill_svm, newdata = test1_used))
+preds_war = binary_convert(predict(war_svm, newdata = test1_used))
+preds_west = binary_convert(predict(western_svm, newdata = test1_used))
+
+test1_complete = test1
+
+mean(preds_act == test1_complete['Action'])
+mean(preds_ad == test1_complete['Adventure'])
+mean(preds_ani == test1_complete['Animation'])
+mean(preds_com == test1_complete['Comedy'])
+mean(preds_cri == test1_complete['Crime'])
+mean(preds_doc == test1_complete['Documentary'])
+mean(preds_dra == test1_complete['Drama'])
+mean(preds_fam == test1_complete['Family'])
+mean(preds_fant == test1_complete['Fantasy'])
+mean(preds_hist == test1_complete['History'])
+mean(preds_hor == test1_complete['Horror'])
+mean(preds_mus == test1_complete['Music'])
+mean(preds_mys == test1_complete['Mystery'])
+mean(preds_rom == test1_complete['Romance'])
+mean(preds_sci == test1_complete['Science Fiction'])
+mean(preds_thr == test1_complete['Thriller'])
+mean(preds_war == test1_complete['War'])
+mean(preds_west == test1_complete['Western'])
+
+mean(preds_act)
+mean(preds_ad )
+mean(preds_ani)
+mean(preds_com)
+mean(preds_cri)
+mean(preds_doc)
+mean(preds_dra)
+mean(preds_fam)
+mean(preds_fant)
+mean(preds_hist)
+mean(preds_hor)
+mean(preds_mus)
+mean(preds_mys)
+mean(preds_rom)
+mean(preds_sci)
+mean(preds_thr)
+mean(preds_war)
+mean(preds_west)
+
+
+
+```
+
+```{r, cache=TRUE}
+
+costs_rbf = seq(.5,10,.5)
+gammas = c(1e-6,1e-5,1e-4,1e-3,1e-2,.05,.1,.5,1)
+
+############# Tuning Action SVM 
+accuracy_act = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy_act) <- costs_rbf
+colnames(accuracy_act) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_act = svm(unlist(train1_complete[,12]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_act))
+  acc = sum(preds == train1[,12])
+  accuracy_act[i,j] = acc
+}
+}
+
+which(accuracy_act==max(accuracy_act))
+
+gam_act = gammas[8]
+cost_act = costs_rbf[3]
+
+
+############# Tuning Adventure SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,13]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,13])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind = TRUE)
+
+gam_adv = gammas[index[2]]
+cost_adv = costs_rbf[index[1]]
+
+############# Tuning Animation SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,14]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,14])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_ani = gammas[index[2]]
+cost_ani = costs_rbf[index[1]]
+
+############# Tuning Comedy SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,15]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,15])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+gam_com = gammas[index[2]]
+cost_com = costs_rbf[index[1]]
+
+
+############# Tuning Crime SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,16]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,16])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+gam_cri = gammas[index[2]]
+cost_cri = costs_rbf[index[1]]
+
+
+############# Tuning Documentary SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,17]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,17])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_doc = gammas[index[2]]
+cost_doc = costs_rbf[index[1]]
+
+############# Tuning Drama SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,18]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,18])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_dra = gammas[index[2]]
+cost_dra = costs_rbf[index[1]]
+
+############# Tuning Family SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,19]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,19])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_fam = gammas[index[2]]
+cost_fam = costs_rbf[index[1]]
+
+############# Tuning Fantasy SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,20]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,20])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_fant = gammas[index[2]]
+cost_fant = costs_rbf[index[1]]
+
+############# Tuning History SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,21]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,21])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_hist = gammas[index[2]]
+cost_hist = costs_rbf[index[1]]
+
+
+############# Tuning Horror SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,22]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,22])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_hor = gammas[index[2]]
+cost_hor = costs_rbf[index[1]]
+
+############# Tuning Music SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,23]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,23])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_mus = gammas[index[2]]
+cost_mus = costs_rbf[index[1]]
+
+
+############# Tuning Mystery SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,24]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,24])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_mys = gammas[index[2]]
+cost_mys = costs_rbf[index[1]]
+
+############# Tuning Romance SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,25]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,25])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_rom = gammas[index[2]]
+cost_rom = costs_rbf[index[1]]
+
+
+############# Tuning Scifi SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,26]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,26])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_scifi = gammas[index[2]]
+cost_scifi = costs_rbf[index[1]]
+
+############# Tuning Thriller SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,27]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,27])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_thr = gammas[index[2]]
+cost_thr = costs_rbf[index[1]]
+
+############# Tuning War SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,28]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,28])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_war = gammas[index[2]]
+cost_war = costs_rbf[index[1]]
+
+############# Tuning Western SVM 
+accuracy = matrix(0, nrow = length(costs_rbf), ncol = length(gammas))
+rownames(accuracy) <- costs_rbf
+colnames(accuracy) <- gammas
+
+for ( i in 1: length(costs_rbf)){
+  for ( j in 1:length(gammas)){
+  svm_tuning = svm(unlist(train1_complete[,29]) ~ .*. , kernel = 'radial' , data=train1_used, cost= costs_rbf[i], gamma= gammas[j])
+  preds = binary_convert(predict(svm_tuning))
+  acc = sum(preds == train1[,29])
+  accuracy[i,j] = acc
+}
+}
+
+index = which(accuracy==max(accuracy), arr.ind  = TRUE)[1,]
+
+gam_wes = gammas[index[2]]
+cost_wes = costs_rbf[index[1]]
+
+```
+
+```{r}
+
+act_heatmap <- heatmap(accuracy_act, Rowv=NA, Colv=NA, col = cm.colors(256), scale='column', margins=c(5,10), main = 'Training Accuracy of Action Genre', ylab = 'Costs', xlab = 'Gamma')
+
+# drama_heatmap <- heatmap(accuracy_drama/1000, Rowv=NA, Colv=NA, col = cm.colors(255), scale= 'column', margins=c(5,10), main = 'Training Accuracy of Drama Genre' , ylab = 'Costs', xlab = 'Gamma')
+
+
+
+
+``` 
+
+
+The maximum accuracy is actually coincident for both of the examples above at spot 162 which corresponds to gamma = .5 and cost = 1.5. This may seem like a fluke, but both also maximize at gamma=1 and cost = 1. We will use the first option going forward. We chose to utilize Action and Drama because they are two of the more major categories, and we felt that they were far apart in terms of characterization of the two genres. So, for simplicity, we only maximized for these two different SVM's and will use these values across all of the SVM's. 
+
+
+```{r, cache=TRUE}
+gam = .5
+c = 1.5
+
+
+
+action_svm = svm(unlist(train1_complete[,12]) ~ .*. , kernel = 'radial' , data=train1_used, gamma = gam_act, cost = cost_act)
+adventure_svm = svm(unlist(train1_complete[,13]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_adv, cost = cost_adv)
+animation_svm = svm(unlist(train1_complete[,14]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_ani, cost = cost_ani)
+comedy_svm = svm(unlist(train1_complete[,15]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_com, cost = cost_com)
+crime_svm = svm(unlist(train1_complete[,16]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_cri, cost = cost_cri)
+doc_svm = svm(unlist(train1_complete[,17]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_doc, cost = cost_doc)
+drama_svm = svm(unlist(train1_complete[,18]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_dra, cost = cost_dra)
+family_svm = svm(unlist(train1_complete[,19]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_fam, cost = cost_fam)
+fantasy_svm = svm(unlist(train1_complete[,20]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_fant, cost = cost_fant)
+hist_svm = svm(unlist(train1_complete[,21]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_hist, cost = cost_hist)
+horror_svm = svm(unlist(train1_complete[,22]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_hor, cost = cost_hor)
+music_svm = svm(unlist(train1_complete[,23]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_mus, cost = cost_mus)
+mystery_svm = svm(unlist(train1_complete[,24]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_mys, cost = cost_mys)
+romance_svm = svm(unlist(train1_complete[,25]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_rom, cost = cost_rom)
+scifi_svm = svm(unlist(train1_complete[,26]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_scifi, cost = cost_scifi)
+thrill_svm = svm(unlist(train1_complete[,27]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_thr, cost = cost_thr)
+war_svm = svm(unlist(train1_complete[,28]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_war, cost = cost_war)
+western_svm = svm(unlist(train1_complete[,29]) ~ .*. , kernel = 'radial',data=train1_used, gamma = gam_wes, cost = cost_wes)
+
+
+
+preds_act = binary_convert(predict(action_svm, newdata = test1_used))
+preds_ad = binary_convert(predict(adventure_svm, newdata = test1_used))
+preds_ani = binary_convert(predict(animation_svm, newdata = test1_used))
+preds_com = binary_convert(predict(comedy_svm, newdata = test1_used))
+preds_cri = binary_convert(predict(crime_svm, newdata = test1_used))
+preds_doc = binary_convert(predict(doc_svm, newdata = test1_used))
+preds_dra = binary_convert(predict(drama_svm, newdata = test1_used))
+preds_fam = binary_convert(predict(family_svm, newdata = test1_used))
+preds_fant = binary_convert(predict(fantasy_svm, newdata = test1_used))
+preds_hist = binary_convert(predict(hist_svm, newdata = test1_used))
+preds_hor = binary_convert(predict(horror_svm, newdata = test1_used))
+preds_mus = binary_convert(predict(music_svm, newdata = test1_used))
+preds_mys = binary_convert(predict(mystery_svm, newdata = test1_used))
+preds_rom = binary_convert(predict(romance_svm, newdata = test1_used))
+preds_sci = binary_convert(predict(scifi_svm, newdata = test1_used))
+preds_thr = binary_convert(predict(thrill_svm, newdata = test1_used))
+preds_war = binary_convert(predict(war_svm, newdata = test1_used))
+preds_west = binary_convert(predict(western_svm, newdata = test1_used))
+
+
+model_acc = c(mean(preds_act == test1_complete['Action']),
+mean(preds_ad == test1_complete['Adventure']),
+mean(preds_ani == test1_complete['Animation']),
+mean(preds_com == test1_complete['Comedy']),
+mean(preds_cri == test1_complete['Crime']),
+mean(preds_doc == test1_complete['Documentary']),
+mean(preds_dra == test1_complete['Drama']),
+mean(preds_fam == test1_complete['Family']),
+mean(preds_fant == test1_complete['Fantasy']),
+mean(preds_hist == test1_complete['History']),
+mean(preds_hor == test1_complete['Horror']),
+mean(preds_mus == test1_complete['Music']),
+mean(preds_mys == test1_complete['Mystery']),
+mean(preds_rom == test1_complete['Romance']),
+mean(preds_sci == test1_complete['Science Fiction']),
+mean(preds_thr == test1_complete['Thriller']),
+mean(preds_war == test1_complete['War']),
+mean(preds_west == test1_complete['Western'])
+)
+
+affirmatives = c(mean(preds_act),
+mean(preds_ad ),
+mean(preds_ani),
+mean(preds_com),
+mean(preds_cri),
+mean(preds_doc),
+mean(preds_dra),
+mean(preds_fam),
+mean(preds_fant),
+mean(preds_hist),
+mean(preds_hor),
+mean(preds_mus),
+mean(preds_mys),
+mean(preds_rom),
+mean(preds_sci),
+mean(preds_thr),
+mean(preds_war),
+mean(preds_west)
+)
+
+genre_names = colnames(train1)[12:29]
+
+barplot(height = model_acc, names.arg = genre_names, ylim=c(0,1), ylab='Test Accuracy', xlab = 'Genre', main = 'SVM Test Accuracy Across Genres', cex.names = .5, las=2, col='lightblue')
+
+barplot(height = affirmatives, names.arg = genre_names, ylab='Test Accuracy', xlab = 'Genre', main = 'SVM Affirmative Predictions Across Genres', cex.names = .5, las=2, col='salmon')
+
+```
+
+
+This SVM model utilizes quantitative data about the movies (budget, popularity, release year, revenue, and runtime), but also includes RGB color data extracted from each of the posters. Our rationale was that poster colors may indicate a "mood" of the movie that can help portray the genre. We carried out this method by taking the mean value for each poster for each of R, G, and B in its color scheme. We also calculated the standard deviation for each component of the RGB vector to show the variation in the color. Lastly, as a part of our data we utilized the correlation distance between the color values. All of this was captured in the final aggregated train and test sets for our data. 
+
+One important aspect of this SVM is that we attempted to reduce the number of possible binary predictions by looking at PCA of the genres to see if there were any typical combinations that could be used instead of individual tags. This turned out not to be the case, so we utilized genre vectors for each movie observation. After balancing the data, we used all 18 different genres in order to try to get predictive models for the less frequent genre types. To this end, we created 18 different SVM's to compare each genre against all the rest and try to get some affirmative predictions. In order to try to get some predictive components, we utilized interaction terms between all of our variables to see if any unique behavior would present itself when given the chance to interact between the quantitative variables and the color behavior. The strength of this model is in the setup to try to get predictive models for the infrequent genres by looking at unique combinations of attributes. 
+This SVM model looks to have fairly good predictive accuracy after we tune it using the same values across all genres, but the affirmative predictions tell a very different story. Virtually all of the infrequent genres have zero affirmative predictions because nothing really differentiates them and the model performs best by just not predicting any affirmative values. There are a number of ways for us to try to rectify this. First of all, the clearest was is to individually tune each SVM. This could help pick up differences for the smaller genres and we will pursue this when time is not a constraint. Additionally, further balancing of the data could be needed. Because of the co-tagging nature it was almost impossible to get down to reasonable ratios between the large and small genres, but this should be examined further. Lastly, we should attempt to incorporate the text components into this SVM because they could help prediction and identification of the smaller genres. 
+
+
+** Update: Tuned the SVM models for each genre. This helped slightly with predictive accuracy but still faced a major issue of low numbers of affirmative predictions in the low-frequency genres. 
+
+
+
+
