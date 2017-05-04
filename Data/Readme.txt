@@ -1,4 +1,4 @@
-Due to space and upload limitiation, the data cannot be loaded in the repository. Instead, a github folder was created that includes the following folders:
+Due to space and upload limitiation, the data cannot be loaded in the github repository. Instead, a shareable google drive folder was created that includes the following folders:
 1 - Actual posters used for training
 2 - Actual posters used for test
 3 - Preprocessedpickle dump files used for the deep learning
