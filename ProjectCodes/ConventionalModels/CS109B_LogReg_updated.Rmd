@@ -1,0 +1,529 @@
+
+#CS109B - Final Project
+Group 26 - Nina Iftikhar
+
+The glmnet package was used to construct logistic regression models for classification of movie genres represented in binary 0-1 values. The binary representation aided in dealing with the multi-label and imbalanced data issues within this data set; data was acquired from TBDM, with missing data supplemented from IMDB where appropriate. We became interested in using overview words for genre classification because of findings during our EDA which showed that this approach may be promising.  
+
+The cv.glm function was used because it allowed for selecting the optimal lambda value via built-in tuning and cross-validation, but the function also has settings that allow control over the model, like setting the tresh value; this defines the convergence threshold for coordinate descent, and is important in determining the limit of coefficient update for the algorithm.
+
+Separate logistical regression models were constructed for each genre- based on the misclassification plots, different values of lambda are needed for higher accuracy by genre. Lambda, the regularization parameter, is important for this algorithm, and for other regression models, because it prevents overfitting on the training set by modifying the optimization problem to prefer small weights (source: https://justindomke.wordpress.com/2008/12/12/why-does-regularization-work/). Hence considerations for bias-variance trade off are built into the model.
+
+Glmnet fits a generalized linear model via penalized maximum likelihood- a grid of values of lambda is used to compute the regularization path for the lasso or the elasticnet penalty (Glmnet Vignette). Therefore, the lambda and alpha parameters were tuned because they are central to this algorithm (see alpha tune chunk), and thus their values are expected to affect the classification accuracy. 
+
+Text2Vec was used to construct document-term-matrices from the Overview field in the data set- the Overview field contains descriptions of the plots of the movies. The objective of creating the DTMs is to use them as “bag-of-words” to drive genre classification via logistic regression. The DTMs were also normalized in order to suppress the overrepresentation of any particular words.
+
+The training set for this model approach is a document-term-matrix of a vocabulary vector made from the overview words for each movie in the sampled train set. The vocabulary vector stores all the term counts and doc terms associated with the each keyword from the overview words fields, and the dtm assigns movie ids to the occurence of those words. The test set for this model approach is a dtm of the test set. 
+
+The optimal metric of this classification approach would be a confusion matrix that shows more true positives and negatives, than false positives and negatives, or an accuracy bar plot.
+
+```{r}
+
+set.seed(200)
+suppressWarnings(suppressMessages(library(text2vec)))
+suppressWarnings(suppressMessages(library(data.table)))
+suppressWarnings(suppressMessages(library(MLmetrics)))
+suppressWarnings(suppressMessages(library(glmnet)))
+suppressWarnings(suppressMessages(library(caret)))
+
+#Note: I followed the directions here to construct a document-term matrix for the Overview field in the data set: http://text2vec.org/vectorization.html
+
+movies <- read.csv("Meta_data_First_All_Cleaned.csv")
+
+#the genre labels matrix attempts to override the imbalanced data and multi-label problems in this data set
+g.labels <- read.csv("Genres_labels_All copy.csv")
+
+head(movies, 4)
+head(g.labels, 4)
+
+movies <- cbind(movies, g.labels)
+
+#coerce data table
+setDT(movies)
+
+#create key on data table called id
+setkey(movies, id)
+
+#set all_id variable to easily refer to ids when splitting
+all_ids = movies$id
+
+#set train ids, difference is test set ids
+train_ids = sample(all_ids, 7491)
+test_ids = setdiff(all_ids, train_ids)
+
+#subset by ids
+train = movies[J(train_ids)]
+test = movies[J(test_ids)]
+```
+
+```{r}
+#The objective is to create a document term matrix, this chunk of code creates a vocabulary vector.
+
+prep_fun = tolower
+tok_fun = word_tokenizer
+
+#itoken() creates an iterator over tokens
+it_train = itoken(as.character(train$overview), 
+             preprocessor = prep_fun, 
+             tokenizer = tok_fun, 
+             ids = train$id, 
+             progressbar = FALSE)
+
+vocab = create_vocabulary(it_train)
+head(vocab,10)
+```
+
+```{r}
+#Document term matrix is created from vocab vector
+vectorizer = vocab_vectorizer(vocab)
+dtm_train = create_dtm(it_train, vectorizer)
+
+#check the dimensions of the DTM to ensure same # of rows as train set, this will be important when running the model
+dim(dtm_train)
+
+vocab
+```
+
+```{r}
+#repeat above steps for test set
+ts.prep_fun = tolower
+ts.tok_fun = word_tokenizer
+
+it_test = itoken(as.character(test$overview), 
+             preprocessor = ts.prep_fun, 
+             tokenizer = ts.tok_fun, 
+             ids = test$id, 
+             progressbar = FALSE)
+
+ts.vocab = create_vocabulary(it_test)
+
+ts.vocab = create_vocabulary(it_test)
+head(ts.vocab,10)
+
+ts.vectorizer = vocab_vectorizer(ts.vocab)
+dtm_test = create_dtm(it_test, ts.vectorizer)
+dim(dtm_test)
+```
+
+```{r}
+#normalize DTMs to remove unequal weight from overrepresentation of certain words
+tfidf = TfIdf$new()
+
+dtm_train_tfidf = fit_transform(dtm_train, tfidf)
+
+dtm_test_tfidf  = create_dtm(it_test, vectorizer) %>% 
+  transform(tfidf)
+```
+
+Alpha values were plotted to determine the best alpha for each one of the 19 models; best value of alpha gives the lowest MSE when plotted over lambda. Alpha is the elastic-net mixing parameter, combines lasso and ridge regression, therefore it must be in the range α ∈ [0,1]. For ease of running the plots function over 19 separate models, alpha was stepped by 0.2.
+
+The foldid parameter allows setting up the cross validation folds before running the models for tuning alpha.
+```{r alpha tune}
+x = dtm_train_tfidf 
+
+plots <- function(y){
+
+foldid=sample(1:10,size=length(y),replace=TRUE)
+cv1=cv.glmnet(x,y,foldid=foldid,alpha=0.2)
+cv2=cv.glmnet(x,y,foldid=foldid,alpha=0.4)
+cv3=cv.glmnet(x,y,foldid=foldid,alpha=0.6)
+cv4=cv.glmnet(x,y,foldid=foldid,alpha=0.8)
+cv5=cv.glmnet(x,y,foldid=foldid,alpha=1)
+
+plot(log(cv1$lambda),cv1$cvm,pch=19,col="red",xlab="log(Lambda)",ylab=cv1$name)
+points(log(cv2$lambda),cv2$cvm,pch=19,col="grey")
+points(log(cv3$lambda),cv3$cvm,pch=19,col="blue")
+points(log(cv4$lambda),cv4$cvm,pch=19,col="green")
+points(log(cv5$lambda),cv5$cvm,pch=19,col="pink")
+legend("topright",legend=c("alpha= .2","alpha= .4", "alpha= .6", "alpha= .8", "alpha= 1"),pch=19,col=c("red","grey", "blue", "green", "pink"))
+
+mse.min1 <- cv1$cvm[cv1$lambda == cv1$lambda.min]
+mse.min2 <- cv2$cvm[cv2$lambda == cv2$lambda.min]
+mse.min3 <- cv3$cvm[cv3$lambda == cv3$lambda.min]
+mse.min4 <- cv4$cvm[cv4$lambda == cv4$lambda.min]
+mse.min5 <- cv5$cvm[cv5$lambda == cv5$lambda.min]
+
+   mses <- cbind(mse.min1, mse.min2, mse.min3, mse.min4, mse.min5)
+   mses <- as.data.frame(mses)
+   return(mses)
+   
+}
+
+apply(train[,15:33],2,plots)
+```
+        Action  Adventure  Animation    Comedy      Crime Documentary     Drama     Family    Fantasy
+[1,] 0.1325201 0.08906477 0.04864058 0.1941113 0.08426901  0.04064171 0.2127845 0.07218937 0.05319670
+[2,] 0.1328166 0.08916923 0.04876307 0.1944108 0.08424354  0.04065542 0.2131184 0.07212872 0.05325774
+[3,] 0.1329427 0.08919738 0.04881739 0.1945339 0.08425693  0.04067155 0.2132548 0.07209167 0.05328253
+[4,] 0.1330485 0.08921478 0.04884216 0.1946057 0.08427830  0.04069139 0.2133211 0.07207209 0.05329398
+[5,] 0.1331501 0.08922616 0.04884504 0.1946527 0.08429573  0.04070574 0.2133567 0.07205487 0.05330376
+        History     Horror      Music    Mystery   Romance Science.Fiction   TV.Movie  Thriller
+[1,] 0.02709648 0.09559806 0.03181055 0.05397884 0.1119673      0.05942226 0.01004372 0.1471946
+[2,] 0.02721936 0.09574700 0.03175188 0.05395156 0.1117565      0.05945573 0.01004375 0.1473630
+[3,] 0.02725629 0.09581951 0.03177520 0.05395159 0.1116973      0.05946177 0.01004377 0.1474183
+[4,] 0.02726468 0.09586636 0.03183213 0.05395328 0.1116662      0.05947532 0.01004370 0.1474496
+[5,] 0.02726783 0.09589498 0.03187170 0.05395127 0.1116450      0.05947457 0.01004367 0.1474710
+            War    Western
+[1,] 0.01942773 0.01520812
+[2,] 0.01941971 0.01523102
+[3,] 0.01940142 0.01526231
+[4,] 0.01943716 0.01538277
+[5,] 0.01954477 0.01549498
+
+Even though cv.glmnet auto-tunes for the best value of lambda, and consequently alpha, experimenting with the model showed that setting an alpha value resulted in a slight increase in accuracy. For example for the Action genre, accuracy was 82.319 without a user-set alpha value, and 82.339 with an alpha value of 0.2. For the 19 models tested below, the optimal value of alpha was chosen based on the previous output. 
+```{r}
+NFOLDS = 5
+thresh = 1e-5 #low thresh value chosen for improving accuracy
+maxit = 1e3 #1000 maximum iterations 
+
+#set to family= binomial due to 0-1 labeling in the genre lables matrix.
+
+#action
+glmnet_classifierA = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,15]), 
+                              family = 'binomial', 
+                              type.measure = "class",
+                              alpha = 0.2,
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+#adv.
+glmnet_classifierB = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,16]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+#animation
+glmnet_classifierC = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,17]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+#comedy
+glmnet_classifierD = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,18]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+#crime
+glmnet_classifierE = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,19]), 
+                              family = 'binomial', 
+                              alpha = 0.4,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+#docs
+glmnet_classifierF = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,20]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+#drama
+glmnet_classifierG = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,21]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+#family
+glmnet_classifierH = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,22]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+#fantasy
+glmnet_classifierI = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,23]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#hist
+glmnet_classifierJ = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,24]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#horror
+glmnet_classifierK = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,25]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#music
+glmnet_classifierL = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,26]), 
+                              family = 'binomial', 
+                              alpha = 0.4,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#mystery
+glmnet_classifierM = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,27]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#romance
+glmnet_classifierN = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,28]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#sci-fi
+glmnet_classifierO = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,29]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#tv-movie
+glmnet_classifierP = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,30]), 
+                              family = 'binomial', 
+                              alpha = 1,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#thriller
+glmnet_classifierQ = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,31]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#war
+glmnet_classifierR = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,32]), 
+                              family = 'binomial', 
+                              alpha = 0.6,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#western
+glmnet_classifierS = cv.glmnet(x = dtm_train_tfidf, y = as.matrix(train[,33]), 
+                              family = 'binomial', 
+                              alpha = 0.2,
+                              type.measure = "class",
+                              nfolds = NFOLDS,
+                              thresh = thresh,
+                              maxit = maxit)
+
+#Missclassification error plots for different values of lambda
+plot(glmnet_classifierA)
+plot(glmnet_classifierB)
+plot(glmnet_classifierC)
+
+plot(glmnet_classifierD)
+plot(glmnet_classifierE)
+plot(glmnet_classifierF)
+
+plot(glmnet_classifierG)
+plot(glmnet_classifierH)
+plot(glmnet_classifierI)
+
+plot(glmnet_classifierJ)
+plot(glmnet_classifierK)
+plot(glmnet_classifierL)
+
+plot(glmnet_classifierM)
+plot(glmnet_classifierN)
+plot(glmnet_classifierO)
+
+plot(glmnet_classifierP)
+plot(glmnet_classifierQ)
+plot(glmnet_classifierR)
+plot(glmnet_classifierS)
+```
+
+The misclassification error plots are useful for visualizing the journey of the misclassification error across different values of lambda- this helps to put the lambda min value used for predictions into context, and helps provide a basis for fine tuning the model if needed.
+
+```{r}
+#predictions on test DTM
+predsA = predict(glmnet_classifierA, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsB = predict(glmnet_classifierB, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsC = predict(glmnet_classifierC, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+
+predsD = predict(glmnet_classifierD, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsE = predict(glmnet_classifierE, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsF = predict(glmnet_classifierF, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+
+predsG = predict(glmnet_classifierG, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsH = predict(glmnet_classifierH, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsI = predict(glmnet_classifierI, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+
+predsJ = predict(glmnet_classifierJ, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsK = predict(glmnet_classifierK, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsL = predict(glmnet_classifierL, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+
+predsM = predict(glmnet_classifierM, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsN = predict(glmnet_classifierN, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsO = predict(glmnet_classifierO, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+
+predsP = predict(glmnet_classifierP, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsQ = predict(glmnet_classifierQ, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsR = predict(glmnet_classifierR, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+predsS = predict(glmnet_classifierS, newx = dtm_test_tfidf, s = "lambda.min", type = "class")
+```
+
+Results indicate that some genres are better predicted than others. For example, Drama and Comedy are notably lower in classification accuracy relative to other genres. This is perhaps because of lack of specific overview words that describe these genres, but may also be because of an artifact of the data- depending on how the genres are assigned to different movies, or how overview words are added for movies of these genres. Indeed, in light of the results of the other models in this study, which also show that these two genres are poorly predicted in general.
+
+```{r}
+#accuracy
+sprintf("Action genre classification accuracy is: %.3f percent", (Accuracy(predsA, test[,15])*100) )
+sprintf("Adventure genre classification accuracy is: %.3f percent", (Accuracy(predsB, test[,16])*100))
+sprintf("Animation genre classification accuracy is: %.3f percent", (Accuracy(predsC, test[,17])*100))
+
+sprintf("Comedy genre classification accuracy is: %.3f percent", (Accuracy(predsD, test[,18])*100))
+sprintf("Crime genre classification accuracy is: %.3f percent", (Accuracy(predsE, test[,19])*100))
+sprintf("Documentary genre classification accuracy is: %.3f percent", (Accuracy(predsF, test[,20])*100))
+
+sprintf("Drama genre classification accuracy is: %.3f percent", (Accuracy(predsG, test[,21])*100))
+sprintf("Family genre classification accuracy is: %.3f percent", (Accuracy(predsH, test[,22])*100))
+sprintf("Fantasy genre classification accuracy is: %.3f percent", (Accuracy(predsI, test[,23])*100))
+
+sprintf("History genre classification accuracy is: %.3f percent", (Accuracy(predsJ, test[,24])*100))
+sprintf("Horror genre classification accuracy is: %.3f percent", (Accuracy(predsK, test[,25])*100))
+sprintf("Music genre classification accuracy is: %.3f percent", (Accuracy(predsL, test[,26])*100))
+
+sprintf("Mystery genre classification accuracy is: %.3f percent", (Accuracy(predsM, test[,27])*100))
+sprintf("Romance genre classification accuracy is: %.3f percent", (Accuracy(predsN, test[,28])*100))
+sprintf("Science Fiction genre classification accuracy is: %.3f percent", (Accuracy(predsO, test[,29])*100))
+
+sprintf("TV Movie genre classification accuracy is: %.3f percent", (Accuracy(predsP, test[,30])*100))
+sprintf("Thriller genre classification accuracy is: %.3f percent", (Accuracy(predsQ, test[,31])*100))
+sprintf("War Fiction genre classification accuracy is: %.3f percent", (Accuracy(predsR, test[,32])*100))
+sprintf("Western Fiction genre classification accuracy is: %.3f percent", (Accuracy(predsS, test[,33])*100))
+```
+
+```{r, warning=FALSE}
+confusionMatrix(predsA, test$Action)
+confusionMatrix(predsB, test$Adventure)
+confusionMatrix(predsC, test$Animation)
+
+confusionMatrix(predsD, test$Comedy)
+confusionMatrix(predsE, test$Crime)
+confusionMatrix(predsF, test$Documentary)
+
+confusionMatrix(predsG, test$Drama)
+confusionMatrix(predsH, test$Family)
+confusionMatrix(predsI, test$Fantasy)
+
+confusionMatrix(predsJ, test$History)
+confusionMatrix(predsK, test$Horror)
+confusionMatrix(predsL, test$Music)
+
+confusionMatrix(predsM, test$Mystery)
+confusionMatrix(predsN, test$Romance)
+confusionMatrix(predsO, test$Science.Fiction)
+
+confusionMatrix(predsP, test$TV.Movie)
+confusionMatrix(predsQ, test$Thriller)
+confusionMatrix(predsR, test$War)
+confusionMatrix(predsS, test$Western)
+
+```
+
+Confusion matrices were visualized to graphically see the proportions of false positives and false negatives. Overall, the confusion matrices "dot plots" show that the green bubbles (true positives and true negative) are relatively larger than the red bubbles (false positives and negatives), indicating that using the overview words to predict movie genres might be a feasible and fruitful approach.
+
+```{r}
+#Note: I used directions from here to construct a four dot plot: https://stackoverflow.com/questions/23891140/r-how-to-visualize-confusion-matrix-using-the-caret-package
+
+par(mfrow=c(2,2))
+ctable <- as.table(matrix(c(1966, 409, 40, 82), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Action")
+ctable2 <- as.table(matrix(c(2242, 254, 1, 0), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable2, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Adventure")
+ctable3 <- as.table(matrix(c(2354, 127, 2, 14), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable3, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Animation")
+ctable4 <- as.table(matrix(c(1440, 561, 160, 336), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable4, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Comedy")
+
+ctable5 <- as.table(matrix(c(2206, 250, 19, 22), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable5, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Crime")
+ctable6 <- as.table(matrix(c(2352, 112, 12, 21), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable6, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Documentary")
+ctable7 <- as.table(matrix(c(1135, 533, 264, 565), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable7, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Drama")
+ctable8 <- as.table(matrix(c(2232, 232, 13, 20), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable8, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Family")
+
+ctable9 <- as.table(matrix(c(2321, 169, 3, 4), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable9, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Fantasy")
+ctable10 <- as.table(matrix(c(2424, 73, 0, 0), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable10, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - History")
+ctable11 <- as.table(matrix(c(2056, 263, 48, 130), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable11, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Horror")
+ctable12 <- as.table(matrix(c(2385, 89, 10, 13), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable12, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Music")
+
+ctable13 <- as.table(matrix(c(2331, 166, 0, 0), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable13, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Mystery")
+ctable14 <- as.table(matrix(c(2092, 330, 30, 45), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable14, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Romance")
+ctable15 <- as.table(matrix(c(2269, 186, 5, 38), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable15, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Science Fiction")
+ctable16 <- as.table(matrix(c(2470, 27, 0, 0), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable16, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - TV Movie")
+
+ctable17 <- as.table(matrix(c(1969, 469, 12, 47), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable17, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Thriller")
+ctable18 <- as.table(matrix(c(2436, 61, 0, 0), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable18, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - War")
+ctable19 <- as.table(matrix(c(2439, 48, 7, 3), nrow = 2, byrow = TRUE))
+fourfoldplot(ctable19, color = c("#CC6666", "#99CC99"),
+             conf.level = 0, margin = 1, main = "Confusion Matrix - Western")
+
+
+
+```
+

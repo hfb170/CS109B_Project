@@ -1,0 +1,180 @@
+---
+title: "Preliminary Examination of Balanced Data"
+author: "Group 26"
+date: "4/19/2017"
+output: pdf_document
+---
+
+```{r}
+library(readr)
+data_bal <- read_csv("~/Library/Mobile Documents/com~apple~CloudDocs/Data Science 2/data_bal.csv")
+genre_bal <- read_csv("~/Library/Mobile Documents/com~apple~CloudDocs/Data Science 2/genre_bal.csv")
+
+cols_data = colnames(data_bal)
+cols_data[5] = 'ID'
+
+colnames(data_bal) <- cols_data
+
+data_bal = data_bal[,c(2,3,5:13)]
+
+genre_bal = genre_bal[,-1]
+
+complete_data = merge(data_bal, genre_bal, by ='ID')
+
+write.csv(complete_data, file = 'complete_data.csv')
+
+```
+
+We aggregated the two different data sets into one large dataset above by linking the movie ID. 
+
+Below, we split the ~ 4900 observations into two test sets of 300 observations and two training sets of ~ 2150 observations. They were all created by random sampling of the balanced data set. 
+
+
+```{r}
+ids = as.vector(genre_bal[,'ID'])
+ids = unlist(ids[,1])
+
+test_index = sample(size = 600, x =  1:length(ids), replace = FALSE)
+test_ids = ids[test_index]
+test_ids1 = test_ids[1:300]
+test_ids2 = test_ids[301:600]
+
+train_ids = ids[-test_index]
+length(train_ids)/2
+train_ids1 = train_ids[1:2167]
+train_ids2 = train_ids[2168:4334]
+
+
+test_index1 = NULL
+test_index2 = NULL
+for( i in 1:300){
+  test_index1 = c(test_index1,which(complete_data[,'ID'] == test_ids1[i]))
+  test_index2 = c(test_index2,which(complete_data[,'ID'] == test_ids2[i]))
+}
+
+train_index1 = NULL
+train_index2 = NULL
+for( i in 1:length(train_ids1)){
+  train_index1 = c(train_index1,which(complete_data[,'ID'] == train_ids1[i]))
+  train_index2 = c(train_index2,which(complete_data[,'ID'] == train_ids2[i]))
+}
+
+test1_data = complete_data[test_index1,]
+test2_data = complete_data[test_index2,]
+
+train1_data = complete_data[train_index1,]
+train2_data = complete_data[train_index2,]
+# 
+# write.csv(test1_data, file = 'test1.csv')
+# write.csv(test2_data, file = 'test2.csv')
+# 
+# write.csv(train1_data, file = 'train1.csv')
+# write.csv(train2_data, file = 'train2.csv')
+
+```
+
+Below is the initial trials of a simple logisitic regression for each of the 18 different genres. These logistic regressions right now only utilize meta-data from the movies (budget, popularity, release year, revenue, and runtime). They include all interaction terms for these quantitative variables. 
+
+```{r}
+train1_used = train1_data[,c(2,6,8:10)]
+test1_used = test1_data[,c(2,6,8:10)]
+
+
+
+action_logit = glm(train1_data[,12] ~ .*. , family=binomial(link='logit'),data=train1_used)
+adventure_logit = glm(train1_data[,13] ~ .*. , family=binomial(link='logit'),data=train1_used)
+animation_logit = glm(train1_data[,14] ~ .*. , family=binomial(link='logit'),data=train1_used)
+comedy_logit = glm(train1_data[,15] ~ .*. , family=binomial(link='logit'),data=train1_used)
+crime_logit = glm(train1_data[,16] ~ .*. , family=binomial(link='logit'),data=train1_used)
+doc_logit = glm(train1_data[,17] ~ .*. , family=binomial(link='logit'),data=train1_used)
+drama_logit = glm(train1_data[,18] ~ .*. , family=binomial(link='logit'),data=train1_used)
+family_logit = glm(train1_data[,19] ~ .*. , family=binomial(link='logit'),data=train1_used)
+fantasy_logit = glm(train1_data[,20] ~ .*. , family=binomial(link='logit'),data=train1_used)
+hist_logit = glm(train1_data[,21] ~ .*. , family=binomial(link='logit'),data=train1_used)
+horror_logit = glm(train1_data[,22] ~ .*. , family=binomial(link='logit'),data=train1_used)
+music_logit = glm(train1_data[,23] ~ .*. , family=binomial(link='logit'),data=train1_used)
+mystery_logit = glm(train1_data[,24] ~ .*. , family=binomial(link='logit'),data=train1_used)
+romance_logit = glm(train1_data[,25] ~ .*. , family=binomial(link='logit'),data=train1_used)
+scifi_logit = glm(train1_data[,26] ~ .*. , family=binomial(link='logit'),data=train1_used)
+thrill_logit = glm(train1_data[,27] ~ .*. , family=binomial(link='logit'),data=train1_used)
+war_logit = glm(train1_data[,28] ~ .*. , family=binomial(link='logit'),data=train1_used)
+western_logit = glm(train1_data[,29] ~ .*. , family=binomial(link='logit'),data=train1_used)
+
+binary_convert = function(preds){
+  preds_bin = preds
+  for ( i in 1:length(preds)){
+  if(preds[i]>.5){preds_bin[i] = 1}
+  else{preds_bin[i] = 0 }
+  }
+  return(preds_bin)
+}
+
+preds_act = binary_convert(predict(action_logit, newdata = test1_data))
+preds_ad = binary_convert(predict(adventure_logit, newdata = test1_data))
+preds_ani = binary_convert(predict(animation_logit, newdata = test1_data))
+preds_com = binary_convert(predict(comedy_logit, newdata = test1_data))
+preds_cri = binary_convert(predict(crime_logit, newdata = test1_data))
+preds_doc = binary_convert(predict(doc_logit, newdata = test1_data))
+preds_dra = binary_convert(predict(drama_logit, newdata = test1_data))
+preds_fam = binary_convert(predict(family_logit, newdata = test1_data))
+preds_fant = binary_convert(predict(fantasy_logit, newdata = test1_data))
+preds_hist = binary_convert(predict(hist_logit, newdata = test1_data))
+preds_hor = binary_convert(predict(horror_logit, newdata = test1_data))
+preds_mus = binary_convert(predict(music_logit, newdata = test1_data))
+preds_mys = binary_convert(predict(mystery_logit, newdata = test1_data))
+preds_rom = binary_convert(predict(romance_logit, newdata = test1_data))
+preds_sci = binary_convert(predict(scifi_logit, newdata = test1_data))
+preds_thr = binary_convert(predict(thrill_logit, newdata = test1_data))
+preds_war = binary_convert(predict(war_logit, newdata = test1_data))
+preds_west = binary_convert(predict(western_logit, newdata = test1_data))
+
+
+
+mean(preds_act == test1_data['Action'])
+mean(preds_ad == test1_data['Adventure'])
+mean(preds_ani == test1_data['Animation'])
+mean(preds_com == test1_data['Comedy'])
+mean(preds_cri == test1_data['Crime'])
+mean(preds_doc == test1_data['Documentary'])
+mean(preds_dra == test1_data['Drama'])
+mean(preds_fam == test1_data['Family'])
+mean(preds_fant == test1_data['Fantasy'])
+mean(preds_hist == test1_data['History'])
+mean(preds_hor == test1_data['Horror'])
+mean(preds_mus == test1_data['Music'])
+mean(preds_mys == test1_data['Mystery'])
+mean(preds_rom == test1_data['Romance'])
+mean(preds_sci == test1_data['Science Fiction'])
+mean(preds_thr == test1_data['Thriller'])
+mean(preds_war == test1_data['War'])
+mean(preds_west == test1_data['Western'])
+
+mean(preds_act)
+mean(preds_ad )
+mean(preds_ani)
+mean(preds_com)
+mean(preds_cri)
+mean(preds_doc)
+mean(preds_dra)
+mean(preds_fam)
+mean(preds_fant)
+mean(preds_hist)
+mean(preds_hor)
+mean(preds_mus)
+mean(preds_mys)
+mean(preds_rom)
+mean(preds_sci)
+mean(preds_thr)
+mean(preds_war)
+mean(preds_west)
+
+
+```
+
+
+We realize from these outputs that the predictive power seems pretty good, but in reality this is just due to the sparsity of affirmative predictions in each of the genres. When there is so much data and the affirmative classifications are rare, we get very few predictions in this model that actually indicate affirmative genres. 
+
+Hopefully, with additional data (such as the poster colors) we will be able to have a more accurate approach. Right now we can see a major potential issue in the sparsity of classifications for each genre compared to the overall number of observations. This is due to our approach of treating each genre differently and thus having 18 different logistic regressions that attempt to find differences between the selected genre and all others. This tells us that we may have approached this multi-label nature incorrectly. It may have been more prudent to identify frequent genre tag combinations and try to predict those. 
+
+
+
